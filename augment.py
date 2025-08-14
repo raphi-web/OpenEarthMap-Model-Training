@@ -1,4 +1,5 @@
 import warnings
+from enum import Enum
 
 import albumentations as A
 import numpy as np
@@ -6,6 +7,13 @@ import torchvision.transforms.functional as TF
 
 warnings.simplefilter("ignore")
 
+
+class AugmentKind(Enum):
+    HEAVY = 1
+    MEDIUM = 2
+    LIGHT = 3
+    VALID = 4
+    TEST = 5
 
 class ToTensor:
     def __init__(self, classes):
@@ -32,7 +40,7 @@ def test_augm(sample):
     return A.Compose(augms)(image=sample["image"], mask=sample["mask"])
 
 
-def train_augm(sample, size=512):
+def train_augm_heavy(sample, size=512):
     augms = [
         A.ShiftScaleRotate(
             scale_limit=0.2, rotate_limit=45, border_mode=0, p=0.7
@@ -81,7 +89,7 @@ def train_augm(sample, size=512):
     return A.Compose(augms)(image=sample["image"], mask=sample["mask"])
 
 
-def train_augm3(sample, size=512):
+def train_augm_light(sample, size=512):
     augms = [
         A.PadIfNeeded(size, size, border_mode=0, p=1.0),
         A.RandomCrop(size, size, p=1.0),
@@ -89,13 +97,7 @@ def train_augm3(sample, size=512):
     return A.Compose(augms)(image=sample["image"], mask=sample["mask"])
 
 
-def valid_augm2(sample, size=512):
-    augms = [A.Resize(height=size, width=size, p=1.0)]
-    return A.Compose(augms, additional_targets={'osm': 'image'})(image=sample["image"], mask=sample["mask"],
-                                                                 osm=sample["osm"])
-
-
-def train_augm2(sample, size=512):
+def train_augm_medium(sample, size=512):
     augms = [
         A.ShiftScaleRotate(
             scale_limit=0.2, rotate_limit=45, border_mode=0, p=0.7
