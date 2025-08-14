@@ -42,6 +42,7 @@ def test_augm(sample):
 
 def train_augm_heavy(sample, size=512):
     augms = [
+        A.Resize(height=size, width=size, p=1.0),
         A.ShiftScaleRotate(
             scale_limit=0.2, rotate_limit=45, border_mode=0, p=0.7
         ),
@@ -91,6 +92,7 @@ def train_augm_heavy(sample, size=512):
 
 def train_augm_light(sample, size=512):
     augms = [
+        A.Resize(height=size, width=size, p=1.0),
         A.PadIfNeeded(size, size, border_mode=0, p=1.0),
         A.RandomCrop(size, size, p=1.0),
     ]
@@ -99,6 +101,7 @@ def train_augm_light(sample, size=512):
 
 def train_augm_medium(sample, size=512):
     augms = [
+        A.Resize(height=size, width=size, p=1.0),
         A.ShiftScaleRotate(
             scale_limit=0.2, rotate_limit=45, border_mode=0, p=0.7
         ),
