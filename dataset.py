@@ -1,10 +1,8 @@
-import os
-
 import numpy as np
 import rasterio
 from torch.utils.data import Dataset as BaseDataset
 
-from augment import ToTensor, train_augm, valid_augm, train_augm2, valid_augm2, train_augm3
+from augment import ToTensor, valid_augm, train_augm3, train_augm
 
 
 def load_multiband(path):
@@ -17,31 +15,10 @@ def load_grayscale(path):
     return (src.read(1)).astype(np.uint8)
 
 
-def get_crs(path):
-    src = rasterio.open(path, "r")
-    return src.crs, src.transform
-
-
-def save_img(path, img, crs, transform):
-    with rasterio.open(
-            path,
-            'w',
-            driver='GTiff',
-            height=img.shape[1],
-            width=img.shape[2],
-            count=img.shape[0],
-            dtype=img.dtype,
-            crs=crs,
-            transform=transform,
-    ) as dst:
-        dst.write(img)
-        dst.close()
-
-
 class Dataset(BaseDataset):
     def __init__(self, label_list, classes=None, size=128, train=False):
         self.fns = label_list
-        self.augm = train_augm3 if train else valid_augm
+        self.augm = train_augm if train else valid_augm
         self.size = size
         self.train = train
         self.to_tensor = ToTensor(classes=classes)
