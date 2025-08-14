@@ -25,19 +25,10 @@ class FocalLoss(nn.Module):
         self.alpha = alpha
         self.gamma = gamma
         self.reduction = reduction
+        self.loss = smp.losses.FocalLoss("multiclass",alpha=alpha,gamma=gamma,reduction=reduction)
 
-    def forward(self, inputs, targets):
-        ce_loss = F.cross_entropy(inputs, targets, reduction='none')
-        pt = torch.exp(-ce_loss)
-        focal_loss = self.alpha * (1 - pt) ** self.gamma * ce_loss
-
-        if self.reduction == 'mean':
-            return focal_loss.mean()
-        elif self.reduction == 'sum':
-            return focal_loss.sum()
-        else:
-            return focal_loss
-
+    def forward(self, y_pred, true):
+       return self.loss(y_pred, true)
 
 class TverskyLoss(nn.Module):
     """Tversky Loss - generalization of Dice loss"""
@@ -48,21 +39,13 @@ class TverskyLoss(nn.Module):
         self.beta = beta  # weight for false negatives
         self.smooth = smooth
 
+        self.loss = smp.losses.TverskyLoss("multiclass",alpha=alpha,beta=beta,smooth=smooth)
+
     def forward(self, y_pred, y_true):
-        # Convert to probabilities
         y_pred = F.softmax(y_pred, dim=1)
-
         # One-hot encode targets
-        y_true_oh = F.one_hot(y_true, num_classes=y_pred.size(1)).permute(0, 3, 1, 2).float()
 
-        # Calculate Tversky coefficient for each class
-        tp = torch.sum(y_pred * y_true_oh, dim=(2, 3))
-        fp = torch.sum(y_pred * (1 - y_true_oh), dim=(2, 3))
-        fn = torch.sum((1 - y_pred) * y_true_oh, dim=(2, 3))
-
-        tversky = (tp + self.smooth) / (tp + self.alpha * fp + self.beta * fn + self.smooth)
-        return 1 - torch.mean(tversky)
-
+        return self.loss(y_pred, y_true)
 
 class AdvancedCombinedLoss(nn.Module):
     """Advanced combined loss with multiple loss functions"""
@@ -89,9 +72,4 @@ class AdvancedCombinedLoss(nn.Module):
                       self.focal_weight * focal +
                       self.tversky_weight * tversky)
 
-        return total_loss, {
-            'dice': dice.item(),
-            'ce': ce.item(),
-            'focal': focal.item(),
-            'tversky': tversky.item()
-        }
+        return total_loss

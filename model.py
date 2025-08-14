@@ -3,11 +3,19 @@ import segmentation_models_pytorch as smp
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-
-from losses import CombinedLoss, AdvancedCombinedLoss, FocalLoss
+from losses import CombinedLoss, AdvancedCombinedLoss, FocalLoss, TverskyLoss
 
 
 class SegModel(pytorch_lightning.LightningModule):
+    # Model configuration constants
+    MODEL_ARCH = 'Unet'
+    ENCODER_NAME = 'efficientnet-b6'
+    ENCODER_WEIGHTS = "imagenet"
+    ENCODER_DEPTH = 6
+    DECODER_CHANNELS = (512, 256, 128, 64, 32, 16)
+    DECODER_INTERPOLATION = "bilinear"
+    INPUT_CHANNELS = 3
+
     def __init__(
             self, n_classes: int,
             learning_rate: float,
@@ -17,43 +25,51 @@ class SegModel(pytorch_lightning.LightningModule):
             dropout_rate=0.1,
             weight_decay=1e-4,
             gradient_clip_val=1.0):
-
         super().__init__()
-        self.model = smp.create_model(
-            arch='Unet',
-            encoder_name='efficientnet-b6',
-            encoder_weights="imagenet",
-            encoder_depth=6,
-            decoder_channels=(512, 256, 128, 64, 32, 16),
-            decoder_interpolation="bilinear",
-            in_channels=3,
-            classes=n_classes)
 
-        if loss_type == 'combined':
-            self.loss_fn = CombinedLoss(dice_weight=0.5, ce_weight=0.5)
-        elif loss_type == 'advanced':
-            self.loss_fn = AdvancedCombinedLoss()
-        elif loss_type == 'dice_focal':
-            self.loss_fn = CombinedLoss(dice_weight=0.6, ce_weight=0.0)
-            self.focal_loss = FocalLoss(alpha=1, gamma=2)
-        else:
-            self.loss_fn = smp.losses.DiceLoss(mode='multiclass')
-
-        self.loss_type = loss_type
-        self.learning_rate = learning_rate
         self.n_classes = n_classes
+        self.learning_rate = learning_rate
         self.dropout_rate = dropout_rate
         self.weight_decay = weight_decay
         self.gradient_clip_val = gradient_clip_val
         self.data_loader_len = data_loader_len
         self.epochs = epochs
+        self.loss_type = loss_type
+
+        self.model = self._create_model()
+        self.loss_fn = self._create_loss_function(loss_type)
+
+    def _create_model(self):
+        """Create and configure the segmentation model."""
+        return smp.create_model(
+            arch=self.MODEL_ARCH,
+            encoder_name=self.ENCODER_NAME,
+            encoder_weights=self.ENCODER_WEIGHTS,
+            encoder_depth=self.ENCODER_DEPTH,
+            decoder_channels=self.DECODER_CHANNELS,
+            decoder_interpolation=self.DECODER_INTERPOLATION,
+            in_channels=self.INPUT_CHANNELS,
+            classes=self.n_classes)
+
+    def _create_loss_function(self, loss_type):
+        """Create and configure the loss function based on the specified type."""
+        loss_functions = {
+            'combined': lambda: CombinedLoss(),
+            'advanced': lambda: AdvancedCombinedLoss(),
+            'focal': lambda: FocalLoss(),
+            'tversky': lambda: TverskyLoss()
+        }
+
+        if loss_type in loss_functions:
+            return loss_functions[loss_type]()
+        else:
+            return smp.losses.DiceLoss(mode='multiclass')
 
     def forward(self, x):
         return self.model(x)
 
-    def _validate(self, y_hat, y):
-        pred_masks = torch.argmax(F.softmax(y_hat, dim=1), dim=1)
-
+    def _validate(self, y_pred, y):
+        pred_masks = torch.argmax(F.softmax(y_pred, dim=1), dim=1)
         tp, fp, fn, tn = smp.metrics.get_stats(
             pred_masks,
             y.argmax(dim=1) if y.dim() > 3 else y,
@@ -66,44 +82,33 @@ class SegModel(pytorch_lightning.LightningModule):
 
         return iou, f1_score, accuracy
 
-    def _compute_loss(self, y_hat, y):
+    def _compute_loss(self, y_pred, y):
         y_target = y.argmax(dim=1).long() if y.dim() > 3 else y.long()
-        if self.loss_type == 'dice_focal':
-            dice_loss = smp.losses.DiceLoss(mode='multiclass')(y_hat, y_target)
-            focal_loss = self.focal_loss(y_hat, y_target)
-            loss = 0.6 * dice_loss + 0.4 * focal_loss
-            return loss
-        elif self.loss_type == 'advanced':
-            loss, loss_components = self.loss_fn(y_hat, y_target)
-            return loss
-        else:
-            return self.loss_fn(y_hat, y_target)
+        return self.loss_fn(y_pred, y_target)
+
+    def _compute_step(self, batch):
+        """Common computation logic for training and validation steps."""
+        x, y = batch['x'], batch['y']
+        y_pred = self(x)
+        loss = self._compute_loss(y_pred, y)
+        iou, f1_score, accuracy = self._validate(y_pred, y)
+        return loss, iou, f1_score, accuracy
+
+    def _log_metrics(self, prefix, loss, iou, f1_score, accuracy):
+        """Log metrics with the specified prefix."""
+        self.log(f'{prefix}_loss', loss, prog_bar=True)
+        self.log(f'{prefix}_iou', iou, prog_bar=True)
+        self.log(f'{prefix}_f1', f1_score, prog_bar=True)
+        self.log(f'{prefix}_acc', accuracy, prog_bar=True)
 
     def training_step(self, batch, batch_idx):
-        x, y = batch['x'], batch['y']
-        y_hat = self(x)
-
-        loss = self._compute_loss(y_hat, y)
-        iou, f1_score, accuracy = self._validate(y_hat, y)
-
-        self.log('train_loss', loss, prog_bar=True)
-        self.log('train_iou', iou, prog_bar=True)
-        self.log('train_f1', f1_score, prog_bar=True)
-        self.log('train_acc', accuracy, prog_bar=True)
-
+        loss, iou, f1_score, accuracy = self._compute_step(batch)
+        self._log_metrics('train', loss, iou, f1_score, accuracy)
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x, y = batch['x'], batch['y']
-        y_hat = self(x)
-
-        loss = self._compute_loss(y_hat, y)
-        iou, f1_score, accuracy = self._validate(y_hat, y)
-
-        self.log('val_loss', loss, prog_bar=True)
-        self.log('val_iou', iou, prog_bar=True)
-        self.log('val_f1', f1_score, prog_bar=True)
-        self.log('val_acc', accuracy, prog_bar=True)
+        loss, iou, f1_score, accuracy = self._compute_step(batch)
+        self._log_metrics('val', loss, iou, f1_score, accuracy)
         return loss
 
     def configure_optimizers(self):
