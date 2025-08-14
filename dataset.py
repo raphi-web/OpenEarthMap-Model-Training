@@ -28,11 +28,11 @@ class Dataset(BaseDataset):
 
         match augment_kind:
             case AugmentKind.LIGHT:
-                self.augm = train_augm_light
+                self.augm = train_augm_light if train else valid_augm
             case AugmentKind.MEDIUM:
-                self.augm = train_augm_medium
+                self.augm = train_augm_medium if train else valid_augm
             case AugmentKind.HEAVY:
-                self.augm = train_augm_heavy
+                self.augm = train_augm_heavy if train else valid_augm
             case AugmentKind.VALID:
                 self.augm = valid_augm
             case AugmentKind.TEST:

@@ -3,21 +3,15 @@ import segmentation_models_pytorch as smp
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
+
 from losses import CombinedLoss, AdvancedCombinedLoss, FocalLoss, TverskyLoss
 
 
 class SegModel(pytorch_lightning.LightningModule):
     # Model configuration constants
-    MODEL_ARCH = 'Unet'
-    ENCODER_NAME = 'efficientnet-b6'
-    ENCODER_WEIGHTS = "imagenet"
-    ENCODER_DEPTH = 6
-    DECODER_CHANNELS = (512, 256, 128, 64, 32, 16)
-    DECODER_INTERPOLATION = "bilinear"
-    INPUT_CHANNELS = 3
 
     def __init__(
-            self, n_classes: int,
+            self, model, n_classes: int,
             learning_rate: float,
             data_loader_len: int,
             epochs: int,
@@ -27,6 +21,7 @@ class SegModel(pytorch_lightning.LightningModule):
             gradient_clip_val=1.0):
         super().__init__()
 
+        self.model = model
         self.n_classes = n_classes
         self.learning_rate = learning_rate
         self.dropout_rate = dropout_rate
@@ -35,21 +30,7 @@ class SegModel(pytorch_lightning.LightningModule):
         self.data_loader_len = data_loader_len
         self.epochs = epochs
         self.loss_type = loss_type
-
-        self.model = self._create_model()
         self.loss_fn = self._create_loss_function(loss_type)
-
-    def _create_model(self):
-        """Create and configure the segmentation model."""
-        return smp.create_model(
-            arch=self.MODEL_ARCH,
-            encoder_name=self.ENCODER_NAME,
-            encoder_weights=self.ENCODER_WEIGHTS,
-            encoder_depth=self.ENCODER_DEPTH,
-            decoder_channels=self.DECODER_CHANNELS,
-            decoder_interpolation=self.DECODER_INTERPOLATION,
-            in_channels=self.INPUT_CHANNELS,
-            classes=self.n_classes)
 
     def _create_loss_function(self, loss_type):
         """Create and configure the loss function based on the specified type."""
