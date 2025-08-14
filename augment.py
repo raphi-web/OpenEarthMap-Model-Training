@@ -129,5 +129,4 @@ def train_augm_medium(sample, size=512):
             p=0.2,
         ),
     ]
-    return A.Compose(augms, additional_targets={'osm': 'image'})(image=sample["image"], mask=sample["mask"],
-                                                                 osm=sample["osm"])
+    return A.Compose(augms, additional_targets={'osm': 'image'})(image=sample["image"], mask=sample["mask"])
