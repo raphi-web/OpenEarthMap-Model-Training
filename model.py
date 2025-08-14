@@ -3,16 +3,29 @@ import segmentation_models_pytorch as smp
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.optim.lr_scheduler import CosineAnnealingLR
+
 from losses import CombinedLoss, AdvancedCombinedLoss, FocalLoss
 
+
 class SegModel(pytorch_lightning.LightningModule):
-    def __init__(self, n_classes: int, learning_rate: float, loss_type='combined', dropout_rate=0.1, weight_decay=1e-4,
-                 gradient_clip_val=1.0):
+    def __init__(
+            self, n_classes: int,
+            learning_rate: float,
+            data_loader_len: int,
+            epochs: int,
+            loss_type='combined',
+            dropout_rate=0.1,
+            weight_decay=1e-4,
+            gradient_clip_val=1.0):
+
         super().__init__()
         self.model = smp.create_model(
             arch='Unet',
-            encoder_name='resnet34',
+            encoder_name='efficientnet-b6',
+            encoder_weights="imagenet",
+            encoder_depth=6,
+            decoder_channels=(512, 256, 128, 64, 32, 16),
+            decoder_interpolation="bilinear",
             in_channels=3,
             classes=n_classes)
 
@@ -32,6 +45,8 @@ class SegModel(pytorch_lightning.LightningModule):
         self.dropout_rate = dropout_rate
         self.weight_decay = weight_decay
         self.gradient_clip_val = gradient_clip_val
+        self.data_loader_len = data_loader_len
+        self.epochs = epochs
 
     def forward(self, x):
         return self.model(x)
@@ -97,10 +112,10 @@ class SegModel(pytorch_lightning.LightningModule):
             lr=self.learning_rate,
             weight_decay=self.weight_decay)
 
-        scheduler = CosineAnnealingLR(
-            optimizer,
-            T_max=self.trainer.max_epochs,
-            eta_min=self.learning_rate * 0.01)
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            optimizer, max_lr=0.01,
+            steps_per_epoch=self.data_loader_len,
+            epochs=self.epochs)
 
         return {
             'optimizer': optimizer,

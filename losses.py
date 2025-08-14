@@ -15,7 +15,6 @@ class CombinedLoss(nn.Module):
     def forward(self, y_pred, y_true):
         dice = self.dice_loss(y_pred, y_true)
         ce = self.ce_loss(y_pred, y_true)
-
         return self.dice_weight * dice + self.ce_weight * ce
 
 
@@ -62,7 +61,6 @@ class TverskyLoss(nn.Module):
         fn = torch.sum((1 - y_pred) * y_true_oh, dim=(2, 3))
 
         tversky = (tp + self.smooth) / (tp + self.alpha * fp + self.beta * fn + self.smooth)
-
         return 1 - torch.mean(tversky)
 
 
@@ -75,7 +73,6 @@ class AdvancedCombinedLoss(nn.Module):
         self.ce_weight = ce_weight
         self.focal_weight = focal_weight
         self.tversky_weight = tversky_weight
-
         self.dice_loss = smp.losses.DiceLoss(mode='multiclass')
         self.ce_loss = nn.CrossEntropyLoss()
         self.focal_loss = FocalLoss(alpha=1, gamma=2)

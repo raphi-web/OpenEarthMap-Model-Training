@@ -1,9 +1,11 @@
 import warnings
+
 import albumentations as A
 import numpy as np
 import torchvision.transforms.functional as TF
 
 warnings.simplefilter("ignore")
+
 
 class ToTensor:
     def __init__(self, classes):
@@ -101,7 +103,7 @@ def train_augm2(sample, size=512):
         A.RandomCrop(size, size, p=1.0),
         A.HorizontalFlip(p=0.75),
         A.VerticalFlip(p=0.75),
-        A.Downscale((0.5,0.75), p=0.05),
+        A.Downscale((0.5, 0.75), p=0.05),
         A.MaskDropout(max_objects=3, fill=0, fill_mask=0, p=0.1),
 
         # distortion
