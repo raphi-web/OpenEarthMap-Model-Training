@@ -46,7 +46,7 @@ class Dataset(BaseDataset):
         if self.train:
             data = self.augm({"image": img, "mask": msk}, self.size)
         else:
-            data = self.augm({"image": img, "mask": msk}, 1024)
+            data = self.augm({"image": img, "mask": msk}, self.size)
         data = self.to_tensor(data)
 
         return {"x": data["image"], "y": data["mask"], "fn": self.fns[idx]}
