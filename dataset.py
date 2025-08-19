@@ -7,7 +7,7 @@ from augment import ToTensor, valid_augm, train_augm_light, train_augm_heavy, Au
 
 def load_multiband(path):
     src = rasterio.open(path, "r")
-    return (np.moveaxis(src.read(), 0, -1)).astype(np.uint8)
+    return (np.moveaxis(src.read(), 0, -1)).astype(np.uint32)
 
 
 def load_grayscale(path):

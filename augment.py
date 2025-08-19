@@ -26,7 +26,8 @@ class ToTensor:
         sample["mask"] = TF.to_tensor(np.concatenate((background, msk), axis=-1))
 
         for key in [k for k in sample.keys() if k != "mask"]:
-            sample[key] = TF.to_tensor(sample[key].astype(np.float32) / 255.0)
+            sample[key] = np.clip(sample[key], 0,10000)
+            sample[key] = TF.to_tensor(sample[key].astype(np.float32) / 10_000)
         return sample
 
 
