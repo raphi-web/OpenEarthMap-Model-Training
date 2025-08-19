@@ -15,8 +15,6 @@ def load_grayscale(path):
     return (src.read(1)).astype(np.uint8)
 
 
-
-
 class Dataset(BaseDataset):
     def __init__(self, label_list, classes=None, size=128, train=False, augment_kind=AugmentKind.MEDIUM):
         self.fns = label_list
